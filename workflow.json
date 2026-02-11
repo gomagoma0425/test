@@ -1,0 +1,50 @@
+{
+  "name": "tts-workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const item = { ...$json };\nconst src = (item.text ?? '').trim();\n\nconst escaped = src\n  .replace(/&/g, '&amp;')\n  .replace(/</g, '&lt;')\n  .replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;')\n  .replace(/'/g, '&apos;');\n\nconst withBreaks = escaped\n  .replace(/、/g, '、<break time=\"120ms\"/>')\n  .replace(/。/g, '。<break time=\"220ms\"/>')\n  .replace(/！/g, '！<break time=\"220ms\"/>')\n  .replace(/？/g, '？<break time=\"220ms\"/>')\n  .replace(/!/g, '!<break time=\"220ms\"/>')\n  .replace(/\\?/g, '?<break time=\"220ms\"/>');\n\nitem.ssml = `<speak><prosody rate=\"95%\" pitch=\"+0.5st\">${withBreaks}</prosody></speak>`;\n\nreturn [{ json: item }];"
+      },
+      "id": "tts_preprocess",
+      "name": "tts_preprocess",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://texttospeech.googleapis.com/v1/text:synthesize",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ {\"input\": {\"ssml\": $json.ssml}, \"voice\": {\"languageCode\": \"ja-JP\", \"name\": \"ja-JP-Neural2-B\"}, \"audioConfig\": {\"audioEncoding\": \"MP3\"}} }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi"
+      },
+      "id": "google音声生成(base64)",
+      "name": "google音声生成(base64)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "tts_preprocess": {
+      "main": [
+        [
+          {
+            "node": "google音声生成(base64)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
