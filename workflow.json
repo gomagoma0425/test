@@ -18,17 +18,43 @@
       "parameters": {
         "method": "POST",
         "url": "https://texttospeech.googleapis.com/v1/text:synthesize",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{$env.GCP_TTS_API_KEY}}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "charset",
+              "value": "utf-8"
+            }
+          ]
+        },
         "sendBody": true,
-        "contentType": "json",
-        "jsonBody": "={\n  \"input\": {\n    \"ssml\": {{$json.ssml}}\n  },\n  \"voice\": {\n    \"languageCode\": \"ja-JP\",\n    \"name\": \"ja-JP-Neural2-B\"\n  },\n  \"audioConfig\": {\n    \"audioEncoding\": \"MP3\"\n  }\n}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "googleApi",
-        "specifyBody": "json"
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"input\": {\n    \"ssml\": \"{{$json.ssml}}\"\n  },\n  \"voice\": {\n    \"languageCode\": \"ja-JP\",\n    \"name\": \"{{$node['Config'].json.ttsVoiceByRole?.[$json.role] ?? $node['Config'].json.ttsVoiceDefault ?? 'ja-JP-Neural2-B'}}\"\n  },\n  \"audioConfig\": {\n    \"audioEncoding\": \"MP3\",\n    \"speakingRate\": {{$node[\"Config\"].json.ttsSpeakingRate ?? 1.0}},\n    \"pitch\": {{$node[\"Config\"].json.ttsPitch ?? 0}},\n    \"volumeGainDb\": {{$node[\"Config\"].json.ttsVolumeGainDb ?? 0}}\n  }\n}\n",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
       },
       "id": "google音声生成(base64)",
       "name": "google音声生成(base64)",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "typeVersion": 4.3,
       "position": [
         760,
         300
