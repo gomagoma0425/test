@@ -42,7 +42,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"input\": {\n    \"ssml\": \"{{$json.ssml}}\"\n  },\n  \"voice\": {\n    \"languageCode\": \"ja-JP\",\n    \"name\": \"{{$node['Config'].json.ttsVoiceByRole?.[$json.role] ?? $node['Config'].json.ttsVoiceDefault ?? 'ja-JP-Neural2-B'}}\"\n  },\n  \"audioConfig\": {\n    \"audioEncoding\": \"MP3\",\n    \"speakingRate\": {{$node[\"Config\"].json.ttsSpeakingRate ?? 1.0}},\n    \"pitch\": {{$node[\"Config\"].json.ttsPitch ?? 0}},\n    \"volumeGainDb\": {{$node[\"Config\"].json.ttsVolumeGainDb ?? 0}}\n  }\n}\n",
+        "jsonBody": "={{ ({ input: { ssml: $json.ssml }, voice: { languageCode: 'ja-JP', name: ($node['Config']?.json?.ttsVoiceByRole?.[$json.role] ?? $node['Config']?.json?.ttsVoiceDefault ?? 'ja-JP-Neural2-B') }, audioConfig: { audioEncoding: 'MP3', speakingRate: ($node['Config']?.json?.ttsSpeakingRate ?? 1.0), pitch: ($node['Config']?.json?.ttsPitch ?? 0), volumeGainDb: ($node['Config']?.json?.ttsVolumeGainDb ?? 0) } }) }}",
         "options": {
           "response": {
             "response": {
