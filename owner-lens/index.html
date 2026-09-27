@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="description" content="決算JSONを読み込み、オーナー利益・再投資・DCF・逆DCFを同じ前提で計算するツール。再投資率は推定と実績を区別します。">
+<title>Owner Lens — 利益の先のキャッシュを読む</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <div class="brand"><span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span>OWNER LENS <span class="version">v1.1</span></div>
+  <nav class="tabs" aria-label="表示ページ"><button class="active" data-tab="analysis" aria-selected="true">分析する</button><button data-tab="data" aria-selected="false">データ・出典</button><button data-tab="prompt" aria-selected="false">プロンプト</button></nav>
+  <div class="top-actions"><button id="csv-btn">結果CSV</button><button class="primary" id="save-btn">JSON保存</button></div>
+</div></header>
+<main class="shell">
+<section id="page-analysis" class="page">
+  <div class="intro"><div><div class="eyebrow">OWNER EARNINGS · REINVESTMENT · DCF</div><h1>利益は、どこへ行く？</h1><p>稼ぐ力と、使い道と、いまの価値を。ひとつの流れで。</p></div><div class="company-tag"><strong id="company-name"></strong><span id="company-meta"></span><span id="dirty-label"></span></div></div>
+  <div id="data-banner" class="banner"></div>
+  <section class="card" style="margin-bottom:22px;border-color:#e6cf9f" aria-label="再投資率についての重要な説明">
+<strong>再投資率40%は、リンナイの実績ではありません。</strong>
+<p style="font-size:13px;margin:8px 0">旧版の40%・追加収益率10%は教育用の初期値でした。初期データでは両方を<strong>未推定</strong>としてDCFを保留します。下の例を選ぶか、設定欄にご自身の仮定を入力してください。維持CAPEX200億円も推定です。</p>
+<div class="button-row"><button id="example-zero" class="small">成長ゼロで比較</button><button id="example-forty" class="small">40%・10%で試算（実績ではない）</button><button id="clear-growth" class="small">成長の仮定を未入力に戻す</button></div>
+<p class="sub" style="margin-bottom:0">株価・決算は固定データで自動更新されません。入力JSONはこのブラウザ内で処理します。閉じる前にJSON保存してください。</p>
+</section>
+  <div id="calculation-errors" class="error-box" hidden></div>
+  <div class="metrics">
+    <div class="card metric featured"><div class="label">モデル上の1株価値 <details class="help"><summary aria-label="DCFの説明">i</summary><div class="help-pop">成長への再投資後に株主へ分配できる現金を、株主資本コストで現在価値に割り引いた値です。入力した仮定に依存し、将来株価の予言ではありません。</div></details></div><div class="value" id="metric-value">—</div><div class="sub" id="metric-gap">—</div></div>
+    <div class="card metric"><div class="label">現在株価 / 正規化PER</div><div class="value" id="metric-price">—</div><div class="sub" id="metric-per">—</div></div>
+    <div class="card metric"><div class="label">維持後のキャッシュ利回り <details class="help"><summary aria-label="オーナー利益の説明">i</summary><div class="help-pop">正規化オーナー利益÷時価総額。まだ成長投資は引いていません。実際の配当利回り・投資リターンではなく、インフレ調整後の「実質利回り」でもありません。</div></details></div><div class="value" id="metric-yield">—</div><div class="sub" id="metric-distribution">—</div></div>
+    <div class="card metric"><div class="label">継続価値への依存度 <details class="help right-help"><summary aria-label="継続価値の説明">i</summary><div class="help-pop">予測期間より後の現金の現在価値÷事業由来の株主価値。株主価値調整は分母から除外します。高いほど、遠い将来の仮定に影響されます。</div></details></div><div class="value" id="metric-terminal">—</div><div class="sub" id="metric-period">—</div></div>
+  </div>
+  <div class="bridge-grid">
+    <section class="card"><div class="section-heading"><div><h2 id="bridge-heading"><span class="section-number">01</span>100円投資したときの、お金の流れ</h2><p>会計利益を、現状維持後のキャッシュに直す。</p></div></div><div class="axis-note" id="bridge-axis">購入価格100円あたり / 正規化した年間額</div><div class="mobile-swipe">グラフ・表は左右にスワイプできます →</div><div class="chart-wrap" id="bridge-chart"></div><div class="inline-formula" id="bridge-formula"></div><div class="chart-note">減価償却は一度戻します。「利益 − 維持投資」だけでは二重控除になります。</div></section>
+    <section class="card"><div class="section-heading"><div><h2><span class="section-number">02</span>残ったお金の、使い道</h2><p>同じお金を、分配と成長の両方に数えない。</p></div></div><div class="allocation-title"><div class="sub">維持後に残るキャッシュ</div><div><strong id="allocation-total">—</strong><small id="allocation-unit"> 円</small></div></div><div class="allocation-bar" aria-label="成長投資と分配可能キャッシュの割合"><span id="allocation-grow" style="background:var(--blue)"></span><span id="allocation-pay" style="background:var(--teal)"></span></div><div class="allocation-legend"><div><div class="label"><i class="legend-dot" style="background:var(--blue)"></i>成長に回す</div><div class="amount" id="allocation-grow-value">—</div><div class="sub" id="allocation-grow-rate">—</div></div><div><div class="label"><i class="legend-dot" style="background:var(--teal)"></i>株主に分配可能</div><div class="amount" id="allocation-pay-value">—</div><div class="sub">DCFに入れるのは、こちら</div></div></div><div class="allocation-callout" id="allocation-insight"></div></section>
+  </div>
+  <div class="chart-grid section">
+    <section class="card"><div class="section-heading"><div><h2><span class="section-number">03</span>年ごとの、1株あたりの現金</h2><p>将来の分配可能CFと、現在価値の違い。</p></div></div><div class="chart-wrap" id="annual-chart"></div><div class="mini-legend"><span><i class="legend-dot" style="background:var(--teal)"></i>分配可能CF / 株</span><span><i class="legend-dot" style="background:#8da6b4"></i>割引後CF / 株</span></div></section>
+    <section class="card"><div class="section-heading"><div><h2>1株価値を、積み上げる</h2><p>各年の現金と、その先の継続価値を区別。</p></div></div><div class="chart-wrap" id="cumulative-chart"></div><div class="chart-note" id="cumulative-note"></div></section>
+  </div>
+  <section class="card section no-print"><div class="section-heading"><div><h2><span class="section-number">04</span>前提を動かして、答えの変化を見る</h2><p>青い欄は編集できます。入力値は自動送信されません。</p></div><span class="pill blue">即時再計算</span></div><div class="preset-row"><div class="button-row"><button class="small" id="preset-cautious">採算 −25% / 割引率 +1pt</button><button class="small" id="preset-base">読込時の前提</button><button class="small" id="preset-up">採算 +25% / 割引率 −1pt</button></div><span class="sub">強弱の例示であり、発生確率ではありません。</span></div>
+    <div class="controls-layout"><div class="control-col"><div class="control-title">A. 正規化した予測1年目 <span class="sub" id="input-unit"></span></div><div class="field-grid" id="base-fields"></div><div class="button-row" style="margin-top:13px"><button class="small" id="use-latest">利益・償却を最新期に</button><button class="small" id="use-mean">利益・償却を5期平均に</button><button class="small" id="maint-da">維持CAPEX＝償却を仮置き</button></div><p class="input-note">平均化ボタンは純利益と減価償却だけを変更します。維持投資・運転資本の前提は別途確認してください。減価償却＝維持投資は確定的な関係ではありません。</p><details class="compact-details"><summary>基準年の採用理由を表示</summary><p id="base-notes"></p></details></div>
+    <div class="control-col"><div class="control-title">B. 成長・割引・成熟期の仮定</div><div id="assumption-fields"></div><div class="notice">「追加投資の収益率」はROE・ROICではありません。成長に使った1円が、翌年以降の維持後キャッシュを毎年何円増やすか、というこのモデルの仮定です。</div></div></div>
+  </section>
+  <div class="reverse-grid section">
+    <section class="card"><div class="section-heading"><div><h2><span class="section-number">05</span>今の株価には、何が必要？</h2><p>逆DCF / 他の前提を固定して投資採算を逆算。</p></div></div><div id="reverse-output"></div><div class="notice">市場が実際にこの成長を予想しているという意味ではありません。割引率、維持投資、成熟期の前提を変えると答えも変わります。</div></section>
+    <section class="card"><div class="section-heading"><div><h2>仮定が違うと、価値はどこまで変わる？</h2><p>縦：株主資本コスト / 横：追加投資の収益率</p></div></div><div class="table-scroll" id="sensitivity"></div><div class="chart-note">各セルは1株価値。枠線は現在設定。濃淡は計算値の大小であり、売買シグナルではありません。</div></section>
+  </div>
+  <section class="card section"><div class="section-heading"><div><h2><span class="section-number">06</span>過去の数字は、どうだった？</h2><p>会計上の再投資効率と、実際に残った現金を確認。</p></div><button class="small" id="show-sources">出典を見る</button></div><div class="history-metrics" id="history-metrics"></div><div class="table-scroll" id="history-table"></div><div class="notice">観測増分ROE＝純利益の変化÷平均自己資本の変化。自社株買い、増資、為替、買収、景気などの影響を含みます。新規投資だけの採算ではなく、将来モデルの投資収益率には自動転用しません。</div></section>
+  <section class="card section"><div class="section-heading"><div><h2>将来キャッシュの内訳と、計算根拠</h2><p id="forecast-table-unit"></p></div><button class="small no-print" id="csv-btn-bottom">結果CSV</button></div><div class="table-scroll" id="forecast-table"></div><details class="compact-details"><summary>使用した式と、成熟期への移行を表示</summary><div id="formula-details"></div></details></section>
+  <section class="card section"><div class="section-heading"><div><h2>数値を使う前の、確認事項</h2><p>このモデルが扱わないリスクも、隠さず表示します。</p></div></div><div class="checking" id="checks-status"></div><div class="warning-list" id="warnings"></div><details class="compact-details"><summary>この試作版の対象範囲・参考資料</summary><p>正のオーナー利益を持つ非金融事業を想定しています。予測中は純借入ゼロ・株数一定、成長投資は自己資金でまかない、その効果は翌年から続くものとします。希薄化・大型買収・大幅な負債返済・赤字転換・縮小事業・投資回収の長い遅延は個別にモデル化していません。すべて名目額、株主個人課税前です。分配可能CFが実際に株主へ還元されるかは、資本配分と統治の別の問題です。</p><p>参考：<a href="https://www.berkshirehathaway.com/letters/1986.html" target="_blank" rel="noopener noreferrer">Berkshire Hathaway / 1986 Letter（オーナー利益の考え方）</a>、<a href="https://pages.stern.nyu.edu/~adamodar/New_Home_Page/valquestions/growth.htm" target="_blank" rel="noopener noreferrer">Aswath Damodaran / The Fundamental Determinants of Growth</a>、<a href="https://www.cfainstitute.org/insights/professional-learning/refresher-readings/2026/free-cash-flow-valuation" target="_blank" rel="noopener noreferrer">CFA Institute / Free Cash Flow Valuation</a>。このアプリの単純化したキャッシュ再投資モデルは、これらの資料そのものの再現ではありません。</p></details></section>
+</section>
+<section id="page-data" class="page" hidden>
+ <div class="intro"><div><div class="eyebrow">IMPORT & AUDIT</div><h1>データを読み、根拠を確かめる。</h1><p>PDFを直接取り込むのではなく、プロンプトで整理したJSONを読み込みます。</p></div></div>
+ <div class="io-grid"><section class="card"><div id="drop-zone" class="drop-zone"><div class="drop-symbol" aria-hidden="true">↥</div><h3>JSONファイルを読み込む</h3><p>ここにドロップ / またはファイルを選択<br>処理はブラウザ内。外部API・サーバーへの送信はありません。</p><button class="primary" id="choose-file">ファイルを選ぶ</button><input id="file-input" type="file" accept=".json,.txt,application/json,text/plain" hidden></div><div class="data-message" id="file-message" role="status" aria-live="polite"></div><div class="button-row"><button class="small" id="load-demo">リンナイ初期データを読み込む</button><button class="small" id="save-template">空テンプレートを保存</button></div><div class="notice">不明値は null のまま扱います。百万円と円、百万株と株、配当と分配可能CFを取り違えないようにしてください。</div></section><section class="card"><div class="section-heading"><div><h2>JSONを貼り付ける</h2><p>AIが返したjsonコードブロックごとでも読み込めます。</p></div></div><textarea id="json-input" aria-label="読み込むJSON" spellcheck="false" placeholder='{"meta": {"schema_version": "1.0", ...}, ...}'></textarea><div class="button-row" style="margin-top:12px"><button class="primary" id="import-text">このJSONで計算する</button><button class="small" id="current-to-editor">現在のJSONを表示</button></div><div class="data-message" id="text-message" role="status" aria-live="polite"></div></section></div>
+ <section class="card section"><div class="section-heading"><div><h2>資料・出典</h2><p id="source-meta"></p></div></div><div class="sources-grid" id="source-list"></div></section>
+ <section class="card section"><div class="section-heading"><div><h2>実績・会社予想・分析者仮定を分ける</h2><p>入力を変更した項目は「手動変更」と記録します。</p></div></div><div class="table-scroll" id="evidence-table"></div></section>
+</section>
+<section id="page-prompt" class="page" hidden>
+ <div class="intro"><div><div class="eyebrow">RESEARCH → JSON → VISUALIZE</div><h1>調べるAIと、計算する画面を分ける。</h1><p>このプロンプトで決算を整理。返されたJSONを、この画面で再計算します。</p></div></div>
+ <section class="card"><div class="section-heading"><div><h2>調査・計算用プロンプト</h2><p>「企業名・証券コード」だけ置き換えて、Web検索できるAIに渡してください。</p></div><div class="button-row"><button class="small" id="download-prompt">TXT保存</button><button class="primary" id="copy-prompt">全文をコピー</button></div></div><div class="prompt-instructions"><div class="prompt-step"><b>01 / RESEARCH</b><strong>一次資料を読む</strong><p>実績と、維持投資・将来採算の仮定を分けて取得。</p></div><div class="prompt-step"><b>02 / IMPORT</b><strong>JSONを読み込む</strong><p>ファイルでも貼り付けでも。数値と出典を一緒に。</p></div><div class="prompt-step"><b>03 / EXPLORE</b><strong>仮定を動かす</strong><p>一つの適正株価より、前提で変わる範囲を見る。</p></div></div><textarea id="prompt-text" readonly aria-label="調査用プロンプト全文" spellcheck="false"></textarea><div class="notice">AIが出した適正株価を表示するだけではありません。JSON内の元データと仮定を使い、ブラウザ側で独立に再計算します。出典の真偽や維持CAPEXの妥当性は人による確認が必要です。</div></section>
+</section>
+<footer class="footer"><div class="brand">OWNER LENS <span class="version">LOCAL EDITION</span></div><div>外部ライブラリなし・自動通信なし / 教育・分析補助用<br>入力はこのページ内だけで保持されます。閉じる前にJSON保存してください。</div></footer>
+</main><div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+<script src="./calculator.js" defer></script>
+<script src="./defaults.js" defer></script>
+<script src="./app.js" defer></script>
+</body></html>
