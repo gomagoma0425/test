@@ -36,7 +36,7 @@ function exportJSON(){
  download(JSON.stringify(out,null,2),safeFilename()+'_owner_lens.json','application/json;charset=utf-8');
  toast('現在の入力・仮定・根拠をJSONに保存しました。');
 }
-function exportCSV(){if(!lastForecast||!lastForecast.valid){toast('必要な入力をそろえてからCSVを保存してください。');return;}download(C.csv(data,lastForecast),safeFilename()+'_dcf.csv','text/csv;charset=utf-8');}
+function exportCSV(){if(!lastForecast||!lastForecast.valid){toast('DCF用の将来仮定が未設定です。再投資率と追加投資の収益率を設定するとCSVを保存できます。');return;}download(C.csv(data,lastForecast),safeFilename()+'_dcf.csv','text/csv;charset=utf-8');}
 function evidenceBadge(path){const e=evidenceFor(path);return '<span class="pill '+(e?.kind==='actual'?'blue':e?.kind==='demo'?'gray':'amber')+'">'+esc(kindLabel(e?.kind))+'</span>';}
 const baseFields=[
  ['market.price','現在株価','shareprice'],['market.shares_outstanding','自己株式控除後の株数','shares'],
@@ -159,7 +159,7 @@ function renderHistorical(){
 }
 function renderForecast(f){
  $('forecast-table-unit').textContent='会社全体は'+amountUnit()+'、1株あたりは'+cur()+'。1年目は正規化した基準額。';
- if(!f.valid){$('forecast-table').innerHTML='<div class="empty-chart">計算に必要な入力が不足、または前提が不整合です。</div>';$('formula-details').textContent='';return;}
+ if(!f.valid){const growthUnset=!C.number(data.assumptions.reinvestment_rate)||!C.number(data.assumptions.incremental_cash_return);$('forecast-table').innerHTML='<div class="empty-chart">'+(growthUnset?'DCFは未計算です。リンナイ固有の再投資率と追加投資の収益率をまだ推定していないため、意図的に空欄にしています。上の「成長ゼロで比較」を押すか、仮定欄に数値を入力すると計算できます。':'DCFの前提に不整合があります。上の警告欄を確認してください。')+'</div>';$('formula-details').textContent='';return;}
  let html='<table><thead><tr><th>予測年</th><th>維持後キャッシュ</th><th>成長への再投資</th><th>分配可能CF</th><th>CF / 株</th><th>割引後CF / 株</th><th>現在価値の累計 / 株</th></tr></thead><tbody>';
  f.rows.forEach(r=>html+='<tr><td>'+r.year+'年目</td><td>'+n(r.owner,0)+'</td><td>'+n(r.reinvestment,0)+'</td><td>'+n(r.fcfe,0)+'</td><td>'+n(f.bm.toShare(r.fcfe),2)+'</td><td>'+n(f.bm.toShare(r.present),2)+'</td><td>'+n(f.bm.toShare(r.cumulative),2)+'</td></tr>');
  html+='<tr style="background:#edf6f3"><td>成熟期の初年（'+(f.a.horizon_years+1)+'年目）</td><td>'+n(f.terminalOwner,0)+'</td><td>'+n(f.terminalReinvestment,0)+'</td><td>'+n(f.terminalFcfe,0)+'</td><td>'+n(f.bm.toShare(f.terminalFcfe),2)+'</td><td colspan="2">継続価値のPV / 株：'+n(f.bm.toShare(f.terminalPresent),2)+'</td></tr>';
@@ -191,10 +191,11 @@ function render(){
  $('data-banner').className='banner'+(data.meta.is_demo?'':' real');
  $('data-banner').innerHTML=data.meta.is_demo?'<strong>架空サンプルで表示中</strong><span>PER13倍の仕組みを試すための教材です。実在企業の数値ではありません。実データは「データ・出典」から読み込めます。</span>':'<strong>入力データによる参考計算</strong><span>決算実績と維持投資・将来採算の仮定を区別してください。基準年の利益は正規化入力で、市場表示の予想PERとは異なる場合があります。</span>';
  const errors=C.validate(data).concat(f.errors||[]);
+ const growthUnset=!C.number(data.assumptions.reinvestment_rate)||!C.number(data.assumptions.incremental_cash_return);
  $('calculation-errors').hidden=!errors.length;
- $('calculation-errors').textContent=errors.length?'計算を保留しています。\n'+[...new Set(errors)].join('\n'):'';
+ $('calculation-errors').textContent=errors.length?(growthUnset?'DCFだけ保留中です。\nリンナイ固有の「再投資率」と「追加投資の収益率」は根拠を確認できていないため、意図的に未設定です。\nオーナー利益までは計算済みです。DCFを見る場合は「成長ゼロで比較」か、下の仮定欄に数値を入力してください。':'DCFの計算を保留しています。\n'+[...new Set(errors)].join('\n')):'';
  $('metric-value').innerHTML=f.valid?money(f.perShare,0):'—';
- $('metric-gap').textContent=f.valid&&data.market.price>0?'現在株価との差 '+(f.perShare/data.market.price>=1?'+':'')+n((f.perShare/data.market.price-1)*100,1)+'% / 仮定に基づく参考値':'必要な入力を確認してください';
+ $('metric-gap').textContent=f.valid&&data.market.price>0?'現在株価との差 '+(f.perShare/data.market.price>=1?'+':'')+n((f.perShare/data.market.price-1)*100,1)+'% / 仮定に基づく参考値':(growthUnset?'DCFの将来仮定は未設定 / オーナー利益までは計算済み':'DCFの前提を確認してください');
  $('metric-price').innerHTML=money(data.market.price,0);
  $('metric-per').textContent='基準利益によるPER '+n(bm.per,1)+'倍 / 利益利回り '+pct(bm.earningsYield,1);
  $('metric-yield').innerHTML=C.number(bm.ownerYield)?n(bm.ownerYield*100,2)+'<small>%</small>':'—';
@@ -232,7 +233,7 @@ function importData(text,where){
   const next=C.parse(text);data=next;original=C.clone(next);dirty=false;importAudit=[];
   const f=C.forecast(data),v=data.verification||{};
   [['owner_earnings',f.bm.owner],['first_year_fcfe',f.valid?f.rows[0].fcfe:null],['dcf_value_per_share',f.valid?f.perShare:null]].forEach(([k,value])=>{if(C.number(v[k])&&C.number(value)&&Math.abs(v[k]-value)>Math.max(.01,Math.abs(value)*.001))importAudit.push('JSONの参考計算 '+k+' とソフトの再計算に差があります。元データから再計算した値を表示しています。');});
-  renderControls();render();msg.classList.add('success');msg.textContent='「'+data.meta.company_name+'」を読み込みました。'+(f.valid?'再計算できました。':'不足する入力は分析画面に表示しています。');
+  renderControls();render();msg.classList.add('success');msg.textContent='「'+data.meta.company_name+'」を読み込みました。'+(f.valid?'DCFまで再計算できました。':'オーナー利益までは計算できます。DCF用の将来仮定は分析画面で設定してください。');
   toast('データを読み込みました。「分析する」で結果を確認できます。');
  }catch(err){msg.classList.add('error');msg.textContent=err.message;}
 }
